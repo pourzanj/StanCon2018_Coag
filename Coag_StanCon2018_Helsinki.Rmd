@@ -1,9 +1,12 @@
 ---
-title: "Relating Disparate Measures of Coagulapathy Using Unorthodox Data: A Hybrid Mechanistic-Statistical Approach"
-author:
-- Arya A. Pourzanjani, Benjamin B. Bales, Tie Bo Wu, Linda R. Petzold^[University of California, Santa Barbara]
+title: 'Relating Disparate Measures of Coagulapathy Using Unorthodox Data: A Hybrid
+  Mechanistic-Statistical Approach'
+author: Arya A. Pourzanjani, Benjamin B. Bales, Tie Bo Wu, Linda R. Petzold^[University
+  of California, Santa Barbara]
 output:
   html_notebook: default
+  html_document:
+    df_print: paged
   pdf_document: default
 bibliography: ref.bib
 ---
@@ -101,7 +104,7 @@ options(mc.cores = parallel::detectCores())
 fit.test.eq.cpp.src <- stanc("stan/fit_test_eq.stan", allow_undefined = TRUE)$cppcode
 
 fit.test.eq.stan.model <- stan_model("stan/fit_test_eq.stan", allow_undefined = TRUE,
-                         includes = paste0('\n#include "', file.path(getwd(), 'c/cubic_spline_solvers.hpp'), '"\n'))
+                         includes = paste0('\n#include "', file.path(getwd(), 'src/cubic_spline_solvers.hpp'), '"\n'))
 
 test.eq.stanfit <- sampling(fit.test.eq.stan.model, chains = 4, iter = 1000,
                 data = list(Nt = 200, ts = seq(0.01, 2.0, by = 0.01), teg = 0.5108256),
@@ -148,7 +151,7 @@ dat <- list(Nt = length(times), ts = times, proteins = proteins, teg = teg, num_
 
 teg.cpp.src <- stanc("stan/fit_teg.stan", allow_undefined = TRUE)$cppcode
 teg.stan.model <- stan_model("stan/fit_teg.stan", allow_undefined = TRUE,
-                         includes = paste0('\n#include "', file.path(getwd(), 'c/cubic_spline_solvers.hpp'), '"\n'))
+                         includes = paste0('\n#include "', file.path(getwd(), 'src/cubic_spline_solvers.hpp'), '"\n'))
 
 teg.fit <- sampling(teg.stan.model, chains = 1, iter = 1000, data = dat,
                 control = list(adapt_delta = 0.9, max_treedepth = 8), refresh = 100,
