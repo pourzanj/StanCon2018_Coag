@@ -1,0 +1,182 @@
+---
+title: "Relating Disparate Measures of Coagulapathy Using Unorthodox Data: A Hybrid Mechanistic-Statistical Approach"
+author:
+- Arya A. Pourzanjani, Benjamin B. Bales, Tie Bo Wu, Linda R. Petzold^[University of California, Santa Barbara]
+output:
+  html_notebook: default
+  pdf_document: default
+bibliography: ref.bib
+---
+
+Traumatic injury is the leading cause of death for people between the ages of 1
+and 44 @Hoyert2012. Many of these deaths are the result of uncontrolled bleeding
+due to a trauma-induced disorder called Acute Traumatic Coagulapathy, or known more simply as
+Coagulopathy @Brohi2003. How major trauma causes Coagulapathy and how to treat the disease is still a subject
+of ongoing research, but there are various competing hypotheses for why many trauma
+patients are coagulapathic. It is generally understood that Coagulopathy comes as
+a result of a malfunction in the body's Coagulation Cascade, a complex network of
+dynamically interacting proteins in blood that is responsible for forming clots @gonzalez2014trauma.
+
+To better study this complex network, and how it is affected during trauma, doctors
+and scientists have two major assays at their disposal: direct protein concentration
+measurements and Thromboelastography, or TEG (Figure 1). Direct protein concentration
+measurements can tell us the concentration levels of key players in the body's coagulation
+system, and thus they can help us acurately understand why a patient's blood is not clotting and how
+they can be treated. Unfortunately, these tests are only available at very select
+number of hospitals specializing in trauma, they are expensive to run, and most importantly
+they are slow to run in a setting where applying the correct treatment as quickly as
+possible is of the utmost importance.
+
+![**Figure 1: Direct protein concetration measurements and TEG are used to examinethe state of the Coagulation Cascade of trauma patients using a small blood sample. While direct protein measurements are obviously more informative of the exact state of patient's blood at any given time, they are slow and expensive to obtain compared to TEG.**](images/coag_system.png)
+
+In contrast to direct protein measurements, TEG measurements are ubiquitous, inexpensive to run,
+and can provide results in as little as 20 minutes. However, they do not measure protein
+concentrations directly. Instead, TEG works by placing a small sample of blood in a cup,
+chemically initiating the clotting process, then using a metal probe to measure the physical size of the resulting clot
+over time in millimeters (mm) (Figure 2). The resulting output is a measure of clot
+thickness over time for the patient that is indicative of several important features of
+their clotting state including:
+
+* How long it takes for a patient's blood to start forming a clot
+* How fast the clot grows once clotting is initiated
+* How strong the patient's clots become
+* How long the clots are able to maintain their integrity before being broken up by the body
+
+![**Figure 2: In a TEG assay a small sample of blodo is placed in a cup which is spun around quickly to initiate the clotting process. A thin metal pin then measures the size over time in millimeters (mm) of the resulting clot.**](images/TEG_cup.png)
+
+## The Goal: Inferring Protein Concentrations Using TEG and Our Mechanistic Understanding of the Coagulation System.
+
+While TEG measurements clearly contain useful information regarding a patient's clotting state,
+they are simply a proxy for the latent system of clotting proteins in the blood that is
+much more difficult to measure. Ideally, we can use our mechanistic understanding of the
+coagulation system in the form of Ordinary Differential Equations (ODEs) along with a statistical model,
+to better understand what exactly TEG is telling us about the state of the underlying coagulation system,
+and furthermore infer a patient's protein concentrations using solely their TEG measurements.
+
+# A Mechanistic Model of the Coagulation System
+
+The coagulation system is a well-studied system with several mechanistic ODE models in the literature
+that describe how the system evolves dynamically over time. Models for the coagulation system vary
+widely in the number of states, reactions, and parameters they contain, including complex models
+with up to 80 states @mitrophanov2014kinetic . For our purposes we developed a simple reduced-order model
+based of off elements from both the work by @mitrophanov2014kinetic as well as @sagar2015dynamic that captures
+the most important players in the coagulation system. The model includes the most basic
+components of the clotting process: the coagulation cascade responsible for forming clots,
+actual clot material, and clot breakdown or Fibrinolysis (Figure 3). 
+
+![**Figure 3: A seven-state model of coagulation that models the clotting process, actual clots, and the clot breakdown process. The rate of activation of FII in the coagulation cascade is summarized by a delay term that is governed by parameters that are specific to the patient.**](images/seven_state_coag_model.png)
+
+The differential equations for this model are shown below. For simplicity we summarized the rate of activation of the protein
+FII using a sigmoid delay function that is parameterized by parameters $b$ and $c$ which are specific to the patient. Values for reaction
+constants were either gathered from the literature or fit using Maximum A-Posteriori (MAP) estimation.
+
+$$
+\begin{eqnarray}
+\frac{dFII}{dt} &=& -\mathrm{CascadeDelay(t, b, c)} \cdot  \mathrm{TFPI(t)} \cdot \frac{FII}{K_{FIIa} + FII}\\
+\frac{dFIIa}{dt} &=& \mathrm{CascadeDelay(t, b, c)} \cdot  \mathrm{TFPI(t)} \cdot \frac{FII}{K_{FIIa} + FII}-k_{AT}\cdot FIIa \cdot AT\\
+\frac{dAT}{dt} &=& -k_{AT}\cdot FIIa \cdot AT\\
+\frac{dFg}{dt} &=& -k_{clot} \cdot FIIa \cdot \frac{Fg}{K_{clot} + Fg}\\
+\frac{dFn}{dt} &=& k_{clot} \cdot FIIa \cdot \frac{Fg}{K_{clot} + Fg} - k_{lys} \cdot tPA \cdot \frac{Fn}{K_{lys} + Fn}\\
+\frac{dtPA}{dt} &=& -k_{PAI}\cdot tPA \cdot PAI\\
+\frac{dPAI}{dt} &=& -k_{PAI}\cdot tPA \cdot PAI\\
+\end{eqnarray}
+$$
+
+### A Mechanistic Model for TEG
+
+# Inferring Hybrid Mechanistic-Statistical Models and the Unorthodox Nature of TEG Data
+Typically mechanistic ODE models are fit in Stan using data that consists of the
+states of the ODE over time, see e.g. . In contrast, our TEG data consists
+
+# Inferring ODEs Using Hitting Time and Max Data in Stan
+
+
+# Testing our Code on the ODE Test Equation
+
+```{r, message=TRUE}
+library(tidyverse)
+library(rstan)
+options(mc.cores = parallel::detectCores())
+
+fit.test.eq.cpp.src <- stanc("stan/fit_test_eq.stan", allow_undefined = TRUE)$cppcode
+
+fit.test.eq.stan.model <- stan_model("stan/fit_test_eq.stan", allow_undefined = TRUE,
+                         includes = paste0('\n#include "', file.path(getwd(), 'c/cubic_spline_solvers.hpp'), '"\n'))
+
+test.eq.stanfit <- sampling(fit.test.eq.stan.model, chains = 4, iter = 1000,
+                data = list(Nt = 200, ts = seq(0.01, 2.0, by = 0.01), teg = 0.5108256),
+                init = list(list(y0 = array(1,1)), list(y0 = array(1,1)), list(y0 = array(1,1)), list(y0 = array(1,1))))
+```
+
+```{r, message= FALSE, warning=FALSE}
+test.eq.stanfit
+pairs(test.eq.stanfit, pars = c("y0", "teg_sim"))
+
+test.eq.stan.samples <- rstan::extract(test.eq.stanfit, pars = c("y0", "teg_sim"))
+
+tibble(y0.prior = rnorm(2000, 1, 0.1), y0.posterior = test.eq.stan.samples$y0[,1]) %>%
+  gather(Distribution, Value) %>%
+  mutate(Distribution = factor(Distribution, levels = c("y0.prior", "y0.posterior"), labels = c("Prior", "Posterior"))) %>%
+  ggplot(aes(Value)) +
+  geom_histogram(binwidth = 0.01) +
+  facet_grid(Distribution ~ ., scales = "free") +
+  xlab(expression(y[0]))
+
+```
+
+# Putting it All Together to Infer Protein Concentrations Using TEG Data
+
+```{r, message= FALSE, warning=FALSE}
+patient.data <- tibble(sex = "Male", age = 22, inj.mech = "StabWound",
+                       FII = 90, AT = 115, Fg = 162*29.41*1e-9, tPA = NA, PAI = NA,
+                       R = 0.8, K = 1.5, MA = 60.2, Ly30 = 1.7)
+
+patient.data
+```
+
+```{r, message=TRUE}
+times <- c(seq(0, 600, by = 6), seq(660, 1800, by = 60))
+
+proteins <- patient.data %>% select(FII, AT, Fg, tPA, PAI) %>% as.matrix %>% as.vector
+proteins <- ifelse(is.na(proteins), -1, proteins)
+
+teg <-  patient.data %>% select(R, K, MA, Ly30) %>% as.matrix %>% as.vector
+
+num_missing <- c(0,0,0,1,1)
+
+dat <- list(Nt = length(times), ts = times, proteins = proteins, teg = teg, num_missing = num_missing)
+
+teg.cpp.src <- stanc("stan/fit_teg.stan", allow_undefined = TRUE)$cppcode
+teg.stan.model <- stan_model("stan/fit_teg.stan", allow_undefined = TRUE,
+                         includes = paste0('\n#include "', file.path(getwd(), 'c/cubic_spline_solvers.hpp'), '"\n'))
+
+teg.fit <- sampling(teg.stan.model, chains = 1, iter = 1000, data = dat,
+                control = list(adapt_delta = 0.9, max_treedepth = 8), refresh = 100,
+                init = list(list(FII_missing = rep(72.0, num_missing[1]),
+                                 AT_missing = array(82.0, num_missing[2]),
+                                 Fg_missing = rep(5.470260e-06, num_missing[3]),
+                                 tPA_missing = array(1.60e-10, num_missing[4]),
+                                 PAI_missing = array(3.36e-10, num_missing[5]),
+                                 theta = c(2.929422, 0.03441414))))
+
+```
+
+```{r}
+teg.stan.samples <- rstan::extract(teg.fit, pars = c("tPA_missing"))
+
+tibble(tPA.prior = rexp(500,1/(4e-10)), tPA.posterior = teg.stan.samples$tPA_missing[,1]) %>%
+  gather(Distribution, Value) %>%
+  #mutate(Distribution = factor(Distribution, levels = c("y0.prior", "y0.posterior"), labels = c("Prior", "Posterior"))) %>%
+  ggplot(aes(Value)) +
+  geom_histogram() +
+  facet_grid(Distribution ~ ., scales = "free") +
+  xlab(expression(y[0]))
+```
+
+## Acknowledgements
+
+Research reported in this publication was performed by the Systems Biology
+Coagulopathy of Trauma Program of the US Army Medical Research and Materiel
+Command under award number W911QY-15-C-0026.
+
+## References
