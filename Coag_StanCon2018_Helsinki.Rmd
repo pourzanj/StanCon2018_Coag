@@ -1,7 +1,7 @@
 ---
 title: 'Relating Disparate Measures of Coagulapathy Using Unorthodox Data: A Hybrid
   Mechanistic-Statistical Approach'
-author: Arya A. Pourzanjani, Benjamin B. Bales, Tie Bo Wu, Linda R. Petzold^[University
+author: Arya A. Pourzanjani, Tie Bo Wu, Benjamin B. Bales, Linda R. Petzold^[University
   of California, Santa Barbara]
 output:
   html_notebook: default
@@ -85,11 +85,98 @@ $$
 \end{eqnarray}
 $$
 
+Using the R package deSolve, we can forward simulate from this ODE to get an idea of what
+the solutions look like:
+
+```{r, message=TRUE}
+library(tidyverse)
+library(deSolve)
+
+seven.state <- function(t, state, parameters) {
+  with(as.list(c(state, parameters)), {
+    
+    cascade_delay <- 1/(1+exp(c-b*t))
+    tfpi <- (1-tfpi_min)/(1+exp(-ct+bt*t)) + tfpi_min
+
+    r_FIIa <- k_FIIa*cascade_delay*tfpi*((FII/g_FII)^c_FIIa)/(K_FIIa + (FII/g_FII)^c_FIIa)
+    r_AT <- k_AT*FIIa*(AT/g_AT)
+    r_clot <- k_clot*FIIa*((Fg/9e-6)^c_clot)/(K_clot + (Fg/9e-6)^c_clot)
+    r_lys <- k_lys*tPA*(Fn^c_lys)/(K_lys + Fn^c_lys)
+    r_PAI <- k_PAI*tPA*PAI
+    
+    dFII <- g_FII*(-r_FIIa)       # pct activity
+    dFIIa <- r_FIIa -r_AT         # 10s of nmol/L
+    dAT <- -g_AT*r_AT             # pct activity
+    dFg <- -r_clot                # 1 mg/dl = 29.41 nmol/L
+    dFn <- 1e7*(r_clot - r_lys)   # mm of clot
+    dtPA <- -r_PAI                # 1 ng/mL = 14.29 pmol/L     
+    dPAI <- -r_PAI                # 1 ng/mL = 23.26 pmol/L
+    
+    list(c(dFII, dFIIa, dAT, dFg, dFn, dtPA, dPAI))
+  })
+}
+
+parameters <- c(g_FII = 100/1.4e-6, g_AT = 100/3.4e-6,
+                c = 5.0, b = 0.4e-1,
+                ct = 10, bt = 0.15e-1, tfpi_min = 0.2,
+                k_FIIa = 3.5e-9, c_FIIa = 1, K_FIIa = 1.4e-6,
+                k_AT = 1.6e4,
+                k_clot = 3.0, c_clot = 1, K_clot = 0.75,
+                k_lys = 1, c_lys = 1, K_lys = 0.5,
+                k_PAI = 4.5e5)
+
+state <- c(FII = 1e2, FIIa = 0, AT = 100, Fg = 9e-6, Fn = 0, tPA = 7e-11, PAI = 4e-10)
+
+times <- seq(0, 1800, by = 2)
+
+out <- ode(y = state, times = times, func = seven.state,
+           parms = parameters, method = "bdf",
+           atol = 1e-6, rtol = 1e-5) %>% as.data.frame %>% as_tibble
+
+out %>%
+  gather(state, value, -time) %>%
+  mutate(state = factor(state, levels = c("FII", "FIIa", "AT", "Fg", "Fn", "tPA", "PAI"))) %>%
+  ggplot(aes(time,value)) + geom_line() + facet_grid(state ~ ., scales = "free")
+```
+
+
 ### A Mechanistic Model for TEG
 
+While the model includes the concentration of $Fn$ (Fibrin) which formed clots are comprised of,
+actual clot thickness which TEG measures is not measuring $Fn$ per se, but some function of it.
+Following @sagar2015dynamic , we used the Hill function
+
+$$
+\mathrm{ClotThickness(t)} = k \frac{Fn^2}{K + Fn^2}
+$$
+with $k = 64.0$ and $K = 100.0$. Clot thickness is plotted below for ODE we simulated above:
+
+```{r, message=TRUE}
+Fn <- out$Fn
+ClotThickness <- 64.0 * Fn^2/(100.0 + Fn^2)
+qplot(times, ClotThickness, geom = "line")
+```
+
 # Inferring Hybrid Mechanistic-Statistical Models and the Unorthodox Nature of TEG Data
-Typically mechanistic ODE models are fit in Stan using data that consists of the
-states of the ODE over time, see e.g. . In contrast, our TEG data consists
+Typically, mechanistic ODE models are fit in Stan using data that consists of the
+states of the ODE over time, see e.g. @carpenterPredatorPrey2018 or @margossianOde2017 . In these settings
+one typically posits an error distribution for the data that is centered around the forward simulated values of the ODE.
+In contrast, our TEG data does not come in the form of clot thickness over time, but rather
+in the form of four quantities derived from the clot thickness curve that are typically used in the medical community to summarize the
+most important properties of a TEG curve (Figure 4). These four quantities are described below:
+
+1. **R:** The time (in minutes) for the clot to reach 2 mm. This quantity represents the time it takes for the clotting process to initiate.
+2. **K:** The time (in minutes) for the clot to reach 20 mm from the time it reached 2 mm. This quantity represents speed of clot formation.
+3. **MA:** The maximum amplitude of the clot i.e. the size of the clot when it is at its largest. This quantity measures the strength of a patient's clot.
+4. **Ly30:** The percentage of the clot which has broken down after 30 minutes as compared to the maximum amplitude of the clot. This quantity measures how fast clots are being broken up.
+
+![**Figure 4: TEG curves represent the thickness of a clot over time and are summarized by the four key quantities R, K, MA, and Ly30.**](images/teg_parameters_diagram.jpg)
+
+To use these quantities to infer unknown parameters and initial conditions, we must first forward simulate our ODE,
+compute the clot thickness as a function of $Fn$, then use the trajectory of clot of thickness over time
+to derive our simulated TEG data, which we finally can compare to our data by positing some statistical model.
+We describe the finer points of this process in the following section.
+
 
 # Inferring ODEs Using Hitting Time and Max Data in Stan
 
@@ -97,7 +184,6 @@ states of the ODE over time, see e.g. . In contrast, our TEG data consists
 # Testing our Code on the ODE Test Equation
 
 ```{r, message=TRUE}
-library(tidyverse)
 library(rstan)
 options(mc.cores = parallel::detectCores())
 
