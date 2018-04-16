@@ -12,19 +12,19 @@ bibliography: ref.bib
 ---
 
 Traumatic injury is the leading cause of death for people under the
-age of 44 @Hoyert2012. Many of these deaths are the result of uncontrolled bleeding
+age of 44 [@Hoyert2012]. Many of these deaths are the result of uncontrolled bleeding
 due to a trauma-induced disorder called Acute Traumatic Coagulapathy, or known more simply as
-Coagulopathy @Brohi2003. How major trauma causes Coagulapathy and how to treat the disease is still a subject
-of ongoing research, but there are various competing hypotheses for why many trauma
-patients are coagulapathic. It is generally understood that Coagulopathy comes as
-a result of a malfunction in the body's Coagulation Cascade, a complex network of
-dynamically interacting proteins in blood that is responsible for forming clots @gonzalez2014trauma.
+Coagulopathy [@Brohi2003]. How major trauma causes Coagulapathy and how to treat the disease is still a subject
+of ongoing research. There are various competing hypotheses for why so many trauma
+patients are coagulapathic. The Coagulation Cascade and the Fibrinolytic system are complex networks of
+dynamically interacting proteins in blood that are responsible for forming and breaking up clots [@gonzalez2014trauma].
 
-To better study this complex network, and how it is affected during trauma, doctors
+It is generally understood that Coagulopathy comes as
+a result of a malfunction in one of or both these systems. To better study these complex networks, and how they are affected during trauma, doctors
 and scientists have two major assays at their disposal: direct protein concentration
-measurements and Thromboelastography, or TEG (Figure 1). Direct protein concentration
+measurements and Thromboelastography, known as TEG (Figure 1). Direct protein concentration
 measurements can tell us the concentration levels of key players in the body's coagulation
-system, and thus they can help us acurately understand why a patient's blood is not clotting and how
+system, thus they can help us to understand why a patient's blood is not clotting and how
 they can be treated. Unfortunately, these tests are only available at very select
 number of hospitals specializing in trauma, they are expensive to run, and most importantly
 they are slow to run in a setting where applying the correct treatment as quickly as
@@ -43,9 +43,9 @@ their clotting state including:
 * How long it takes for a patient's blood to start forming a clot
 * How fast the clot grows once clotting is initiated
 * How strong the patient's clots become
-* How long the clots are able to maintain their integrity before being broken up by the body
+* How long the clots are able to maintain their integrity before being broken up
 
-![**Figure 2: In a TEG assay a small sample of blodo is placed in a cup which is spun around quickly to initiate the clotting process. A thin metal pin then measures the size over time in millimeters (mm) of the resulting clot.**](images/TEG_cup.png)
+![**Figure 2: In a TEG assay a small sample of blood is placed in a cup which is spun around quickly to initiate the clotting process. A thin metal pin then measures the size over time in millimeters (mm) of the resulting clot.**](images/TEG_cup.png)
 
 ## The Goal: Inferring Protein Concentrations Using TEG and Our Mechanistic Understanding of the Coagulation System.
 
@@ -54,22 +54,22 @@ they are simply a proxy for the latent system of clotting proteins in the blood 
 much more difficult to measure. Ideally, we can use our mechanistic understanding of the
 coagulation system in the form of Ordinary Differential Equations (ODEs) along with a statistical model,
 to better understand what exactly TEG is telling us about the state of the underlying coagulation system,
-and furthermore infer a patient's protein concentrations using solely their TEG measurements.
+and furthermore to infer a patient's protein concentrations using solely their TEG measurements.
 
 # A Mechanistic Model of the Coagulation System
 
-The coagulation system is a well-studied system with several mechanistic ODE models in the literature
+The coagulation system is a well-studied, with several mechanistic ODE models in the literature
 that describe how the system evolves dynamically over time. Models for the coagulation system vary
 widely in the number of states, reactions, and parameters they contain, including complex models
-with up to 80 states @mitrophanov2014kinetic . For our purposes we developed a simple reduced-order model
-based of off elements from both the work by @mitrophanov2014kinetic as well as @sagar2015dynamic that captures
+with up to 80 states [@mitrophanov2014kinetic] . For our purposes we developed a simple reduced-order model
+based off of elements from both the work by [@mitrophanov2014kinetic] as well as [@sagar2015dynamic] that captures
 the most important players in the coagulation system. The model includes the most basic
 components of the clotting process: the coagulation cascade responsible for forming clots,
 actual clot material, and clot breakdown or Fibrinolysis (Figure 3). 
 
 ![**Figure 3: A seven-state model of coagulation that models the clotting process, actual clots, and the clot breakdown process. The rate of activation of FII in the coagulation cascade is summarized by a delay term that is governed by parameters that are specific to the patient.**](images/seven_state_coag_model.png)
 
-We model the coagualation cascade as primarily consisting of the activation of the blood protein $FII$ to its activated form $FIIa$ via the action of a sigmoid delay function that is parameterized by parameters $b$ and $c$. We model these parameter values as specific to the patient. Importantly, $FIIa$ can be blocked by antithrombin ($AT$). $FIIa$ once activated can then facilitate the conversion of raw clot material, Fibrinogen, or $Fg$ in to an actual clot Fibrin, or $Fn$. Once a clot is formed, the clot can be broken up by the protein $tPA$, which itself can be blocked by the protein $PAI$. The differential equations for this model summarize this process and are shown below. Values for reaction constants represent how fast these respective reactions occur with respect to on another. The values we used for these constant were either gathered from the literature or fit using Maximum A-Posteriori (MAP) estimation.
+We model the coagualation cascade as primarily consisting of the activation of the blood protein FactorII ($FII$) to its activated form $FIIa$ via the action of a sigmoid delay function that is parameterized by parameters $b$ and $c$. We model these parameter values as specific to the patient. Importantly, $FIIa$ can be blocked by antithrombin ($AT$). $FIIa$ once activated can then facilitate the conversion of raw clot material, Fibrinogen, or $Fg$ in to an actual clot Fibrin, or $Fn$. Once a clot is formed, the clot can be broken up by the protein $tPA$, which itself can be blocked by the protein $PAI$. The differential equations for this model summarize this process and are shown below. Values for reaction constants represent how fast these respective reactions occur with respect to on another. The values we used for these constant were either gathered from the literature or fit using Maximum A-Posteriori (MAP) estimation.
 
 $$
 \begin{eqnarray}
@@ -140,14 +140,14 @@ out %>%
 
 ### A Mechanistic Model for TEG
 
-While the model includes the concentration of $Fn$ (Fibrin) which formed clots are comprised of,
-actual clot thickness which TEG measures is not measuring $Fn$ per se, but some function of it.
+While the model includes the concentration of $Fn$ (Fibrin) which is a criticial component of clots,
+the actual clot thickness which TEG measures is not measuring $Fn$ per se, but some function of it.
 Following @sagar2015dynamic , we used the Hill function
 
 $$
 \mathrm{ClotThickness(t)} = k \frac{Fn^2}{K + Fn^2}
 $$
-with $k = 64.0$ and $K = 100.0$ to translate $Fn$ to clot thickness. Clot thickness is plotted below for ODE we simulated above:
+with $k = 64.0$ and $K = 100.0$ to translate $Fn$ to clot thickness. Clot thickness is plotted below for the ODE we simulated above:
 
 ```{r, message=TRUE}
 Fn <- out$Fn
@@ -157,7 +157,7 @@ qplot(times, ClotThickness, geom = "line")
 
 # Inferring Hybrid Mechanistic-Statistical Models and the Unorthodox Nature of TEG Data
 Typically, mechanistic ODE models are fit in Stan using data that consists of the
-states of the ODE over time, see e.g. @carpenterPredatorPrey2018 or @margossianOde2017 . In these settings
+states of the ODE over time, see e.g. [@carpenterPredatorPrey2018] or [@margossianOde2017] . In these settings
 one typically posits an error distribution for the data that is centered around the forward simulated values of the ODE.
 In contrast, our TEG data does not come in the form of clot thickness over time, but rather
 in the form of four quantities derived from the clot thickness curve that are typically used in the medical community to summarize the
@@ -196,7 +196,7 @@ p(R | R^{(sim)}(y_0, \theta)).
 $$
 
 For HMC to get the correct gradients, we have to be careful about how we compute the hitting 
-time $R^{sim}(y_0, \theta)$ in our Stan program. First note, that the ODE solver in Stan will return
+time $R^{sim}(y_0, \theta)$ in our Stan program. First, note that the ODE solver in Stan will return
 the value of the solution at discrete time points, which we will then use to compute clot thickness, $C_n$ at the
 discrete time points $t_1, \cdots, t_N$. $R$ is a continuous value formally defined as
 
@@ -224,10 +224,10 @@ Fortunately, the Stan language is expressive enough to allow us to easily implem
 computing a smooth function $C(t)$ that interpolates through the discrete points $C_n,\, n=0,\cdots, N$
 defined at the points $t_0, \cdots, t_N$. In particular, we can write a function in Stan to
 fit a cubic interpolating spline through a given set of points. We provide a quick review of cubic smoothing
-splines and how to compute them loosely following the exposition in @quarteroni2010numerical . Actual Stan code for computing
+splines and how to compute them loosely following the exposition in [@quarteroni2010numerical] . Actual Stan code for computing
 cubic splines is freely available in our Stan files.
 
-Our aim is to derive the functional form a group of cubic splines $s_{3,i-1}(t)$ over the intervals $[t_{i-1}, t_i]$. The functions will be cubic polynomials and will be twice differentiable, even at the nodes $t_0, \cdots, t_N$. We first define $f_i = s_3(t_i)$, $m_i = s_3(t_i)$, and $M_i = s_3''(t_i)$ for $i = 0, \cdots, N$. Since $s_{3,i-1}$ is a cubic polynomial, its second derivative is linear. Since the cubic spline must have continuous second derivatives we have
+Our aim is to derive the functional form of a group of cubic splines $s_{3,i-1}(t)$ over the intervals $[t_{i-1}, t_i]$. The functions will be cubic polynomials and will be twice differentiable, even at the nodes $t_0, \cdots, t_N$. We first define $f_i = s_3(t_i)$, $m_i = s_3(t_i)$, and $M_i = s_3''(t_i)$ for $i = 0, \cdots, N$. Since $s_{3,i-1}$ is a cubic polynomial, its second derivative is linear. Since the cubic spline must have continuous second derivatives we have
 
 $$
 s_{3,i-1}''(t) = M_{i-1} \frac{t_i - t}{h_i} + M_i \frac{t - t_{i-1}}{h_i}
@@ -263,7 +263,7 @@ d_i &=& \frac{6}{h_i + h_{i+1}} \left( \frac{f_{i+1} - f_i}{h_{i+1}} - \frac{f_i
 \end{eqnarray}
 $$
 for $i = 1, \cdots, N-1$. Setting $\lambda_0 = \mu_N = 1$ and $d_0 = d_1$ leads to the following linear equation which
-defines are spline coefficients:
+defines our spline coefficients:
 
 $$
 \begin{pmatrix}
@@ -301,7 +301,7 @@ Letting $C(t | y_0, \theta)$ represent our spline function that interpolates the
 $$
 C(R(y_0, \theta) | y_0, \theta) = 2.0.
 $$
-Note that $R$, the time that the clot hits 2.0 mm is dependent on the initial value of the system, as well as the parameter values of the system. Taking the partial derivative of the both sides of the equation with respect to $\theta$ yields
+Note that $R$, the time that the clot hits 2.0 mm is dependent on the initial value of the system, as well as the parameter values of the system. Taking the partial derivative of both sides of the equation with respect to $\theta$ yields
 
 $$
 \frac{\partial}{\partial R}C(R | y_0, \theta) \frac{\partial R}{\partial \theta} + \frac{\partial}{\partial \theta} C(R | y_0, \theta) = 0.0.
@@ -315,12 +315,12 @@ $$
 
 
 This solve can be accomplished and the correct partial derivative will be used in Stan's HMC implementation by simply
-passing the function $C(t)$ to the algebraic solver available in Stan which uses a modified version of Newton Iterations to find
-the solution of nonlinear systems of equations @margossianAlgSolver2018 .
+passing the function $C(t)$ to the algebraic solver available in Stan which uses a modified version of Newton's method to find
+the solution of nonlinear systems of equations [@margossianAlgSolver2018] .
 
 Because Newton Iterations may diverge with a bad starting point, and at the time of this writing Stan's algebraic solver does not support
 variable initial guesses, we opted to implement a custom C++ solver based off of the bisection method. For a tutorial on using custom
-C++ functions and their gradients in Stan models see @balesCustomGradients2018 .
+C++ functions and their gradients in Stan models see [@balesCustomGradients2018] .
 
 ### Obtaining the Max of Our Spline Function
 
@@ -381,9 +381,9 @@ tibble(y0.prior = rnorm(2000, 1, 0.1), y0.posterior = test.eq.stan.samples$y0[,1
 # Putting it All Together to Infer Protein Concentrations Using TEG Data
 
 Now that we know our Stan code works on a simple problem, it's time to try it out on some real trauma data. We will try out
-our model on the following trauma patient who we have TEG values for and initial protein values for all the proteins in our model
+our model on the following trauma patient for whom we have TEG values for and initial protein values for all the proteins in our model
 except for $tPA$ and $PAI$. Our goal here will be to infer this patients initial concentration of $tPA$ given their
-TEG measurements. In theory this should be possible because $tPA$ is a protein primarily responsible for clot break up
+TEG measurements. In theory this should be possible because $tPA$ is a protein primarily responsible for clot breakup
 and the Ly30 measurement of TEG measures the amount of clot breakup after 30 minutes. In this case, the patient has an unusually high
 Ly30 value of 1.7, indicating that 1.7% of their clot already broke up after only 30 minutes. In light of this, we should expect
 this patient to have a higher than average $tPA$ concentration.
@@ -398,7 +398,7 @@ patient.data
 
 ### Choosing Priors for Unknown Protein Concentrations and Model Parameters
 
-Recall that in our mechanistic model every patient has "cascade delay" parameters $b$ and $c$ that describe the specific state of the coagulation cascade. Using our four pieces of TEG data, we are must infer there two parameters and also the value of the unknown protein concentrations $tPA$ and $PAI$ for our patient. To do this reasonably,
+Recall that in our mechanistic model every patient has "cascade delay" parameters $b$ and $c$ that describe the specific state of the coagulation cascade. Using our four pieces of TEG data, we must infer there two parameters and also the value of the unknown protein concentrations $tPA$ and $PAI$ for our patient. To do this reasonably,
 it helps to incorporate any prior knowledge we have about these parameters. For the protein concentrations, we set the prior distributions to exponential distributions with respective means 4e-10 and 9.3e-10. These are the distributions of these protein concentrations for general trauma patients. With the information given it's reasonable to assume our trauma patient's protein values are drawn form the distribution of protein values for trauma patients. For $b$ and $c$, we use weakly informative priors that are representative of a wide variety of possible coagulation profiles that we would expect to see in trauma patients.
 
 With our priors set, we are ready to fit our model, integrating our prior knowledge and our data to produce a posterior distribution of this patient's $tPA$ values:
