@@ -4,15 +4,15 @@ title: 'Relating Disparate Measures of Coagulapathy Using Unorthodox Data: A Hyb
 author: Arya A. Pourzanjani, Tie Bo Wu, Benjamin B. Bales, Linda R. Petzold^[University
   of California, Santa Barbara]
 output:
-  html_notebook: default
   html_document:
     df_print: paged
+  html_notebook: default
   pdf_document: default
 bibliography: ref.bib
 ---
 
-Traumatic injury is the leading cause of death for people between the ages of 1
-and 44 @Hoyert2012. Many of these deaths are the result of uncontrolled bleeding
+Traumatic injury is the leading cause of death for people under the
+age of 44 @Hoyert2012. Many of these deaths are the result of uncontrolled bleeding
 due to a trauma-induced disorder called Acute Traumatic Coagulapathy, or known more simply as
 Coagulopathy @Brohi2003. How major trauma causes Coagulapathy and how to treat the disease is still a subject
 of ongoing research, but there are various competing hypotheses for why many trauma
@@ -69,9 +69,7 @@ actual clot material, and clot breakdown or Fibrinolysis (Figure 3).
 
 ![**Figure 3: A seven-state model of coagulation that models the clotting process, actual clots, and the clot breakdown process. The rate of activation of FII in the coagulation cascade is summarized by a delay term that is governed by parameters that are specific to the patient.**](images/seven_state_coag_model.png)
 
-The differential equations for this model are shown below. For simplicity we summarized the rate of activation of the protein
-FII using a sigmoid delay function that is parameterized by parameters $b$ and $c$ which are specific to the patient. Values for reaction
-constants were either gathered from the literature or fit using Maximum A-Posteriori (MAP) estimation.
+We model the coagualation cascade as primarily consisting of the activation of the blood protein $FII$ to its activated form $FIIa$ via the action of a sigmoid delay function that is parameterized by parameters $b$ and $c$. We model these parameter values as specific to the patient. Importantly, $FIIa$ can be blocked by antithrombin ($AT$). $FIIa$ once activated can then facilitate the conversion of raw clot material, Fibrinogen, or $Fg$ in to an actual clot Fibrin, or $Fn$. Once a clot is formed, the clot can be broken up by the protein $tPA$, which itself can be blocked by the protein $PAI$. The differential equations for this model summarize this process and are shown below. Values for reaction constants represent how fast these respective reactions occur with respect to on another. The values we used for these constant were either gathered from the literature or fit using Maximum A-Posteriori (MAP) estimation.
 
 $$
 \begin{eqnarray}
@@ -86,7 +84,7 @@ $$
 $$
 
 Using the R package deSolve, we can forward simulate from this ODE to get an idea of what
-the solutions look like:
+the solutions for this system look like:
 
 ```{r, message=TRUE}
 library(tidyverse)
@@ -149,7 +147,7 @@ Following @sagar2015dynamic , we used the Hill function
 $$
 \mathrm{ClotThickness(t)} = k \frac{Fn^2}{K + Fn^2}
 $$
-with $k = 64.0$ and $K = 100.0$. Clot thickness is plotted below for ODE we simulated above:
+with $k = 64.0$ and $K = 100.0$ to translate $Fn$ to clot thickness. Clot thickness is plotted below for ODE we simulated above:
 
 ```{r, message=TRUE}
 Fn <- out$Fn
@@ -179,7 +177,7 @@ We describe the finer points of this process in the following section.
 
 
 # Inferring ODEs Using Hitting Time and Max Data in Stan
-In the typical ODE estimation setting, where our data consists of the value of the ODE states over time, $y_n,\,n = 1,\cdots, n$
+In the typical ODE estimation setting, where our data consists of the value of the ODE states over time, $y_n,\,n = 1,\cdots, N$
 we typically have a likelihood of the form
 
 $$
@@ -190,8 +188,8 @@ where $y_n^{(sim)}(y_0, \theta)$ is a forward simulation of our ODE given the in
 and the parameters $\theta$. The Hamiltonian Monte Carlo (HMC) algorithm in Stan works by taking derivates
 of the likelihood with resepct to the quantities we are trying to estimate, in this case $y_0$ and $\theta$.
 
-In our case is data consists of hitting times like $R$, which is the time the clot takes to reach a size of
-20 mm, and we instead set up a probabilistic model, or likelihood of the form
+In our case, the data consists of hitting times like $R$, which is the time the clot takes to reach a size of
+2 mm, and we instead set up a probabilistic model, or likelihood of the form
 
 $$
 p(R | R^{(sim)}(y_0, \theta)).
@@ -259,38 +257,115 @@ where
 
 $$
 \begin{eqnarray}
-\widetilde{C}_{i-1} &=& f_{i-1} - M_{i-1} \frac{h_i^2}{6}\\
-C_{i-1} &=& \frac{f_i-f_{i-1}}{h_i} - \frac{h_i}{6} (M_i - M_{i-1})
+\mu_i &=& \frac{h_i}{h_i + h_{i+1}}\\
+\lambda_i &=& \frac{h_{i+1}}{h_i + h_{i+1}}\\
+d_i &=& \frac{6}{h_i + h_{i+1}} \left( \frac{f_{i+1} - f_i}{h_{i+1}} - \frac{f_i - f_{i-1}}{h_i} \right)
 \end{eqnarray}
 $$
+for $i = 1, \cdots, N-1$. Setting $\lambda_0 = \mu_N = 1$ and $d_0 = d_1$ leads to the following linear equation which
+defines are spline coefficients:
+
+$$
+\begin{pmatrix}
+2 & \lambda_0 & 0 & \cdots & 0\\
+\mu_1 & 2 & \lambda_1 &  \ddots & \vdots\\
+0  & \ddots & \ddots & \ddots &  0\\
+\vdots & \ddots & \mu_{N-1} & 2 & \lambda_{N-1}\\
+0 & \cdots & 0 & \mu_N &  2
+\end{pmatrix}
+\begin{pmatrix}
+M_0\\
+M_1\\
+\vdots\\
+M_{N-1}\\
+M_N
+\end{pmatrix}
+=
+\begin{pmatrix}
+d_0\\
+d_1\\
+\vdots\\
+d_{N-1}\\
+d_N
+\end{pmatrix}
+$$
+
+Because this system is tridiagonal, we can solve it in $\mathcal{O}(N)$ time using the Thomas algorithm, which is implemented in our provided Stan files.
 
 ### Obtaining Hitting Times from the Spline Interpolation
 
 With our continuous clot thickness function in hand, we are now able to compute stopping times that are a smooth
 function of our unknowns by using an algebraic solver on our continuous function and appealing to the implicit function theorem.
+Letting $C(t | y_0, \theta)$ represent our spline function that interpolates the discrete points $C_n(y_0, \theta)$, $R$ is defined implicitly as
+
+$$
+C(R(y_0, \theta) | y_0, \theta) = 2.0.
+$$
+Note that $R$, the time that the clot hits 2.0 mm is dependent on the initial value of the system, as well as the parameter values of the system. Taking the partial derivative of the both sides of the equation with respect to $\theta$ yields
+
+$$
+\frac{\partial}{\partial R}C(R | y_0, \theta) \frac{\partial R}{\partial \theta} + \frac{\partial}{\partial \theta} C(R | y_0, \theta) = 0.0.
+$$
+
+which then yields the correct partial derivative we need for HMC:
+
+$$
+\frac{\partial R}{\partial \theta} = - \frac{\partial}{\partial \theta} C(R | y_0, \theta) \left( \frac{\partial}{\partial R}C(R | y_0, \theta)  \right)^{-1}.
+$$
+
+
+This solve can be accomplished and the correct partial derivative will be used in Stan's HMC implementation by simply
+passing the function $C(t)$ to the algebraic solver available in Stan which uses a modified version of Newton Iterations to find
+the solution of nonlinear systems of equations @margossianAlgSolver2018 .
+
+Because Newton Iterations may diverge with a bad starting point, and at the time of this writing Stan's algebraic solver does not support
+variable initial guesses, we opted to implement a custom C++ solver based off of the bisection method. For a tutorial on using custom
+C++ functions and their gradients in Stan models see @balesCustomGradients2018 .
 
 ### Obtaining the Max of Our Spline Function
 
+Note that the MA, or maximum amplitude TEG values also requires a nonlinear solve to obtain. To compute this value we also
+use custom C++ code based off of the bisection method on the derivative of the function. In this case the appropriate gradient
+can be comptued similarly.
+
 # Testing our Code on the ODE Test Equation
+
+We first try out our code for inferring unknowns using hitting times on the simple ODE test equation:
+
+$$
+\frac{dy}{dt} = -\lambda y.
+$$
+with initial value $y(0) = 1$ and $\lambda = 1$. The solution of this equation is simply $y(t) = e^{-t}$, which hits the
+value $y(t) = 0.6$ at $t = -\ln 0.6 \approx = 0.5108$. We set up a Stan model to infer the value of the initial condition
+given the value of the hitting time.
 
 ```{r, message=TRUE}
 library(rstan)
 options(mc.cores = parallel::detectCores())
 
+# use special include arugments since we're compiling a Stan model with externally
+# defined custom C++ code
 fit.test.eq.cpp.src <- stanc("stan/fit_test_eq.stan", allow_undefined = TRUE)$cppcode
 
 fit.test.eq.stan.model <- stan_model("stan/fit_test_eq.stan", allow_undefined = TRUE,
                          includes = paste0('\n#include "', file.path(getwd(), 'src/cubic_spline_solvers.hpp'), '"\n'))
 
+# fit model
 test.eq.stanfit <- sampling(fit.test.eq.stan.model, chains = 4, iter = 1000,
                 data = list(Nt = 200, ts = seq(0.01, 2.0, by = 0.01), teg = 0.5108256),
                 init = list(list(y0 = array(1,1)), list(y0 = array(1,1)), list(y0 = array(1,1)), list(y0 = array(1,1))))
 ```
 
+As expected, the value of the hitting time and the value of the initial condition are highly correlated. When the initial condition
+is large, it takes longer for the ODE to reach $y(t) = 0.6$. Note that our posterior samples have a much smaller
+variance than our prior samples, indicating that the stopping time is very informative of the initial value of the ODE.
+
 ```{r, message= FALSE, warning=FALSE}
+# print posterior summary and pairs plot
 test.eq.stanfit
 pairs(test.eq.stanfit, pars = c("y0", "teg_sim"))
 
+# compare prior to posterior
 test.eq.stan.samples <- rstan::extract(test.eq.stanfit, pars = c("y0", "teg_sim"))
 
 tibble(y0.prior = rnorm(2000, 1, 0.1), y0.posterior = test.eq.stan.samples$y0[,1]) %>%
@@ -305,6 +380,14 @@ tibble(y0.prior = rnorm(2000, 1, 0.1), y0.posterior = test.eq.stan.samples$y0[,1
 
 # Putting it All Together to Infer Protein Concentrations Using TEG Data
 
+Now that we know our Stan code works on a simple problem, it's time to try it out on some real trauma data. We will try out
+our model on the following trauma patient who we have TEG values for and initial protein values for all the proteins in our model
+except for $tPA$ and $PAI$. Our goal here will be to infer this patients initial concentration of $tPA$ given their
+TEG measurements. In theory this should be possible because $tPA$ is a protein primarily responsible for clot break up
+and the Ly30 measurement of TEG measures the amount of clot breakup after 30 minutes. In this case, the patient has an unusually high
+Ly30 value of 1.7, indicating that 1.7% of their clot already broke up after only 30 minutes. In light of this, we should expect
+this patient to have a higher than average $tPA$ concentration.
+
 ```{r, message= FALSE, warning=FALSE}
 patient.data <- tibble(sex = "Male", age = 22, inj.mech = "StabWound",
                        FII = 90, AT = 115, Fg = 162*29.41*1e-9, tPA = NA, PAI = NA,
@@ -313,7 +396,15 @@ patient.data <- tibble(sex = "Male", age = 22, inj.mech = "StabWound",
 patient.data
 ```
 
+### Choosing Priors for Unknown Protein Concentrations and Model Parameters
+
+Recall that in our mechanistic model every patient has "cascade delay" parameters $b$ and $c$ that describe the specific state of the coagulation cascade. Using our four pieces of TEG data, we are must infer there two parameters and also the value of the unknown protein concentrations $tPA$ and $PAI$ for our patient. To do this reasonably,
+it helps to incorporate any prior knowledge we have about these parameters. For the protein concentrations, we set the prior distributions to exponential distributions with respective means 4e-10 and 9.3e-10. These are the distributions of these protein concentrations for general trauma patients. With the information given it's reasonable to assume our trauma patient's protein values are drawn form the distribution of protein values for trauma patients. For $b$ and $c$, we use weakly informative priors that are representative of a wide variety of possible coagulation profiles that we would expect to see in trauma patients.
+
+With our priors set, we are ready to fit our model, integrating our prior knowledge and our data to produce a posterior distribution of this patient's $tPA$ values:
+
 ```{r, message=TRUE}
+# format data for Stan
 times <- c(seq(0, 600, by = 6), seq(660, 1800, by = 60))
 
 proteins <- patient.data %>% select(FII, AT, Fg, tPA, PAI) %>% as.matrix %>% as.vector
@@ -325,27 +416,31 @@ num_missing <- c(0,0,0,1,1)
 
 dat <- list(Nt = length(times), ts = times, proteins = proteins, teg = teg, num_missing = num_missing)
 
+# compile Stan model with custom C++ code
 teg.cpp.src <- stanc("stan/fit_teg.stan", allow_undefined = TRUE)$cppcode
 teg.stan.model <- stan_model("stan/fit_teg.stan", allow_undefined = TRUE,
                          includes = paste0('\n#include "', file.path(getwd(), 'src/cubic_spline_solvers.hpp'), '"\n'))
 
+# fit model
 teg.fit <- sampling(teg.stan.model, chains = 1, iter = 1000, data = dat,
-                control = list(adapt_delta = 0.9, max_treedepth = 8), refresh = 100,
+                control = list(adapt_delta = 0.99, max_treedepth = 8), refresh = 100,
                 init = list(list(FII_missing = rep(72.0, num_missing[1]),
                                  AT_missing = array(82.0, num_missing[2]),
-                                 Fg_missing = rep(5.470260e-06, num_missing[3]),
-                                 tPA_missing = array(1.60e-10, num_missing[4]),
-                                 PAI_missing = array(3.36e-10, num_missing[5]),
-                                 theta = c(2.929422, 0.03441414))))
+                                 Fg_missing = rep(5.5-06, num_missing[3]),
+                                 tPA_missing = array(1.6e-10, num_missing[4]),
+                                 PAI_missing = array(3.4e-10, num_missing[5]),
+                                 theta = c(3.0, 0.03))))
 
 ```
+
+Our MCMC diagnostics all pass, and we are ready to examine the posterior distribution of this patient's $tPA$ concentration. Sure enough, this patient's $tPA$ concentration is higher than the population average, which we used as our prior distribution. This is reflective of their relatively high Ly30 value, just as we expected. 
 
 ```{r}
 teg.stan.samples <- rstan::extract(teg.fit, pars = c("tPA_missing"))
 
 tibble(tPA.prior = rexp(500,1/(4e-10)), tPA.posterior = teg.stan.samples$tPA_missing[,1]) %>%
   gather(Distribution, Value) %>%
-  #mutate(Distribution = factor(Distribution, levels = c("y0.prior", "y0.posterior"), labels = c("Prior", "Posterior"))) %>%
+  mutate(Distribution = factor(Distribution, levels = c("tPA.prior", "tPA.posterior"), labels = c("Prior", "Posterior"))) %>%
   ggplot(aes(Value)) +
   geom_histogram() +
   facet_grid(Distribution ~ ., scales = "free") +
