@@ -4,10 +4,10 @@ title: 'Relating Disparate Measures of Coagulapathy Using Unorthodox Data: A Hyb
 author: Arya A. Pourzanjani, Tie Bo Wu, Benjamin B. Bales, Linda R. Petzold^[University
   of California, Santa Barbara]
 output:
+  pdf_document: default
+  html_notebook: default
   html_document:
     df_print: paged
-  html_notebook: default
-  pdf_document: default
 bibliography: ref.bib
 ---
 
@@ -72,7 +72,7 @@ actual clot material, and clot breakdown or Fibrinolysis (Figure 3).
 We model the coagualation cascade as primarily consisting of the activation of the blood protein FactorII ($FII$) to its activated form $FIIa$ via the action of a sigmoid delay function that is parameterized by parameters $b$ and $c$. We model these parameter values as specific to the patient. Importantly, $FIIa$ can be blocked by antithrombin ($AT$). $FIIa$ once activated can then facilitate the conversion of raw clot material, Fibrinogen, or $Fg$ in to an actual clot Fibrin, or $Fn$. Once a clot is formed, the clot can be broken up by the protein $tPA$, which itself can be blocked by the protein $PAI$. The differential equations for this model summarize this process and are shown below. Values for reaction constants represent how fast these respective reactions occur with respect to on another. The values we used for these constant were either gathered from the literature or fit using Maximum A-Posteriori (MAP) estimation.
 
 $$
-\begin{eqnarray}
+\begin{aligned}
 \frac{dFII}{dt} &=& -\mathrm{CascadeDelay(t, b, c)} \cdot  \mathrm{TFPI(t)} \cdot \frac{FII}{K_{FIIa} + FII}\\
 \frac{dFIIa}{dt} &=& \mathrm{CascadeDelay(t, b, c)} \cdot  \mathrm{TFPI(t)} \cdot \frac{FII}{K_{FIIa} + FII}-k_{AT}\cdot FIIa \cdot AT\\
 \frac{dAT}{dt} &=& -k_{AT}\cdot FIIa \cdot AT\\
@@ -80,13 +80,13 @@ $$
 \frac{dFn}{dt} &=& k_{clot} \cdot FIIa \cdot \frac{Fg}{K_{clot} + Fg} - k_{lys} \cdot tPA \cdot \frac{Fn}{K_{lys} + Fn}\\
 \frac{dtPA}{dt} &=& -k_{PAI}\cdot tPA \cdot PAI\\
 \frac{dPAI}{dt} &=& -k_{PAI}\cdot tPA \cdot PAI\\
-\end{eqnarray}
+\end{aligned}
 $$
 
 Using the R package deSolve, we can forward simulate from this ODE to get an idea of what
 the solutions for this system look like:
 
-```{r, message=TRUE}
+```{r, message=FALSE}
 library(tidyverse)
 library(deSolve)
 
@@ -243,10 +243,10 @@ The constants $C_{i-1}$ and $\widetilde{C}_{i-1}$ are uniquely determined by imp
 $s_3(t_{i-1}) = f_{i-1}$ and $s_3(t_i) = f_i$, yielding for $i = 1, \cdots, N-1$
 
 $$
-\begin{eqnarray}
+\begin{aligned}
 \widetilde{C}_{i-1} &=& f_{i-1} - M_{i-1} \frac{h_i^2}{6}\\
 C_{i-1} &=& \frac{f_i-f_{i-1}}{h_i} - \frac{h_i}{6} (M_i - M_{i-1})
-\end{eqnarray}
+\end{aligned}
 $$
 By imposing continuity of the first dervivatives at the nodes we arrive at the linear system
 
@@ -256,11 +256,11 @@ $$
 where
 
 $$
-\begin{eqnarray}
+\begin{aligned}
 \mu_i &=& \frac{h_i}{h_i + h_{i+1}}\\
 \lambda_i &=& \frac{h_{i+1}}{h_i + h_{i+1}}\\
 d_i &=& \frac{6}{h_i + h_{i+1}} \left( \frac{f_{i+1} - f_i}{h_{i+1}} - \frac{f_i - f_{i-1}}{h_i} \right)
-\end{eqnarray}
+\end{aligned}
 $$
 for $i = 1, \cdots, N-1$. Setting $\lambda_0 = \mu_N = 1$ and $d_0 = d_1$ leads to the following linear equation which
 defines our spline coefficients:
@@ -351,9 +351,9 @@ fit.test.eq.stan.model <- stan_model("stan/fit_test_eq.stan", allow_undefined = 
                          includes = paste0('\n#include "', file.path(getwd(), 'src/cubic_spline_solvers.hpp'), '"\n'))
 
 # fit model
-test.eq.stanfit <- sampling(fit.test.eq.stan.model, chains = 4, iter = 1000,
-                data = list(Nt = 200, ts = seq(0.01, 2.0, by = 0.01), teg = 0.5108256),
-                init = list(list(y0 = array(1,1)), list(y0 = array(1,1)), list(y0 = array(1,1)), list(y0 = array(1,1))))
+# test.eq.stanfit <- sampling(fit.test.eq.stan.model, chains = 4, iter = 1000,
+#                 data = list(Nt = 200, ts = seq(0.01, 2.0, by = 0.01), teg = 0.5108256),
+#                 init = list(list(y0 = array(1,1)), list(y0 = array(1,1)), list(y0 = array(1,1)), list(y0 = array(1,1))))
 ```
 
 As expected, the value of the hitting time and the value of the initial condition are highly correlated. When the initial condition
@@ -362,19 +362,19 @@ variance than our prior samples, indicating that the stopping time is very infor
 
 ```{r, message= FALSE, warning=FALSE}
 # print posterior summary and pairs plot
-test.eq.stanfit
-pairs(test.eq.stanfit, pars = c("y0", "teg_sim"))
-
-# compare prior to posterior
-test.eq.stan.samples <- rstan::extract(test.eq.stanfit, pars = c("y0", "teg_sim"))
-
-tibble(y0.prior = rnorm(2000, 1, 0.1), y0.posterior = test.eq.stan.samples$y0[,1]) %>%
-  gather(Distribution, Value) %>%
-  mutate(Distribution = factor(Distribution, levels = c("y0.prior", "y0.posterior"), labels = c("Prior", "Posterior"))) %>%
-  ggplot(aes(Value)) +
-  geom_histogram(binwidth = 0.01) +
-  facet_grid(Distribution ~ ., scales = "free") +
-  xlab(expression(y[0]))
+# test.eq.stanfit
+# pairs(test.eq.stanfit, pars = c("y0", "teg_sim"))
+# 
+# # compare prior to posterior
+# test.eq.stan.samples <- rstan::extract(test.eq.stanfit, pars = c("y0", "teg_sim"))
+# 
+# tibble(y0.prior = rnorm(2000, 1, 0.1), y0.posterior = test.eq.stan.samples$y0[,1]) %>%
+#   gather(Distribution, Value) %>%
+#   mutate(Distribution = factor(Distribution, levels = c("y0.prior", "y0.posterior"), labels = c("Prior", "Posterior"))) %>%
+#   ggplot(aes(Value)) +
+#   geom_histogram(binwidth = 0.01) +
+#   facet_grid(Distribution ~ ., scales = "free") +
+#   xlab(expression(y[0]))
 
 ```
 
@@ -405,46 +405,46 @@ With our priors set, we are ready to fit our model, integrating our prior knowle
 
 ```{r, message=TRUE}
 # format data for Stan
-times <- c(seq(0, 600, by = 6), seq(660, 1800, by = 60))
-
-proteins <- patient.data %>% select(FII, AT, Fg, tPA, PAI) %>% as.matrix %>% as.vector
-proteins <- ifelse(is.na(proteins), -1, proteins)
-
-teg <-  patient.data %>% select(R, K, MA, Ly30) %>% as.matrix %>% as.vector
-
-num_missing <- c(0,0,0,1,1)
-
-dat <- list(Nt = length(times), ts = times, proteins = proteins, teg = teg, num_missing = num_missing)
-
-# compile Stan model with custom C++ code
-teg.cpp.src <- stanc("stan/fit_teg.stan", allow_undefined = TRUE)$cppcode
-teg.stan.model <- stan_model("stan/fit_teg.stan", allow_undefined = TRUE,
-                         includes = paste0('\n#include "', file.path(getwd(), 'src/cubic_spline_solvers.hpp'), '"\n'))
-
-# fit model
-teg.fit <- sampling(teg.stan.model, chains = 1, iter = 1000, data = dat,
-                control = list(adapt_delta = 0.99, max_treedepth = 8), refresh = 100,
-                init = list(list(FII_missing = rep(72.0, num_missing[1]),
-                                 AT_missing = array(82.0, num_missing[2]),
-                                 Fg_missing = rep(5.5-06, num_missing[3]),
-                                 tPA_missing = array(1.6e-10, num_missing[4]),
-                                 PAI_missing = array(3.4e-10, num_missing[5]),
-                                 theta = c(3.0, 0.03))))
+# times <- c(seq(0, 600, by = 6), seq(660, 1800, by = 60))
+# 
+# proteins <- patient.data %>% select(FII, AT, Fg, tPA, PAI) %>% as.matrix %>% as.vector
+# proteins <- ifelse(is.na(proteins), -1, proteins)
+# 
+# teg <-  patient.data %>% select(R, K, MA, Ly30) %>% as.matrix %>% as.vector
+# 
+# num_missing <- c(0,0,0,1,1)
+# 
+# dat <- list(Nt = length(times), ts = times, proteins = proteins, teg = teg, num_missing = num_missing)
+# 
+# # compile Stan model with custom C++ code
+# teg.cpp.src <- stanc("stan/fit_teg.stan", allow_undefined = TRUE)$cppcode
+# teg.stan.model <- stan_model("stan/fit_teg.stan", allow_undefined = TRUE,
+#                          includes = paste0('\n#include "', file.path(getwd(), 'src/cubic_spline_solvers.hpp'), '"\n'))
+# 
+# # fit model
+# teg.fit <- sampling(teg.stan.model, chains = 1, iter = 1000, data = dat,
+#                 control = list(adapt_delta = 0.99, max_treedepth = 8), refresh = 100,
+#                 init = list(list(FII_missing = rep(72.0, num_missing[1]),
+#                                  AT_missing = array(82.0, num_missing[2]),
+#                                  Fg_missing = rep(5.5-06, num_missing[3]),
+#                                  tPA_missing = array(1.6e-10, num_missing[4]),
+#                                  PAI_missing = array(3.4e-10, num_missing[5]),
+#                                  theta = c(3.0, 0.03))))
 
 ```
 
 Our MCMC diagnostics all pass, and we are ready to examine the posterior distribution of this patient's $tPA$ concentration. Sure enough, this patient's $tPA$ concentration is higher than the population average, which we used as our prior distribution. This is reflective of their relatively high Ly30 value, just as we expected. 
 
 ```{r}
-teg.stan.samples <- rstan::extract(teg.fit, pars = c("tPA_missing"))
-
-tibble(tPA.prior = rexp(500,1/(4e-10)), tPA.posterior = teg.stan.samples$tPA_missing[,1]) %>%
-  gather(Distribution, Value) %>%
-  mutate(Distribution = factor(Distribution, levels = c("tPA.prior", "tPA.posterior"), labels = c("Prior", "Posterior"))) %>%
-  ggplot(aes(Value)) +
-  geom_histogram() +
-  facet_grid(Distribution ~ ., scales = "free") +
-  xlab(expression(y[0]))
+# teg.stan.samples <- rstan::extract(teg.fit, pars = c("tPA_missing"))
+# 
+# tibble(tPA.prior = rexp(500,1/(4e-10)), tPA.posterior = teg.stan.samples$tPA_missing[,1]) %>%
+#   gather(Distribution, Value) %>%
+#   mutate(Distribution = factor(Distribution, levels = c("tPA.prior", "tPA.posterior"), labels = c("Prior", "Posterior"))) %>%
+#   ggplot(aes(Value)) +
+#   geom_histogram() +
+#   facet_grid(Distribution ~ ., scales = "free") +
+#   xlab(expression(y[0]))
 ```
 
 ## Acknowledgements
