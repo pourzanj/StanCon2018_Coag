@@ -4,10 +4,10 @@ title: 'Relating Disparate Measures of Coagulapathy Using Unorthodox Data: A Hyb
 author: Arya A. Pourzanjani, Tie Bo Wu, Benjamin B. Bales, Linda R. Petzold^[University
   of California, Santa Barbara]
 output:
-  pdf_document: default
-  html_notebook: default
   html_document:
     df_print: paged
+  html_notebook: default
+  pdf_document: default
 bibliography: ref.bib
 ---
 
@@ -86,9 +86,13 @@ $$
 Using the R package deSolve, we can forward simulate from this ODE to get an idea of what
 the solutions for this system look like:
 
-```{r, message=FALSE}
+```{r}
 library(tidyverse)
 library(deSolve)
+```
+
+
+```{r, message=FALSE, cache = TRUE}
 
 seven.state <- function(t, state, parameters) {
   with(as.list(c(state, parameters)), {
@@ -152,7 +156,7 @@ with $k = 64.0$ and $K = 100.0$ to translate $Fn$ to clot thickness. Clot thickn
 ```{r, message=TRUE}
 Fn <- out$Fn
 ClotThickness <- 64.0 * Fn^2/(100.0 + Fn^2)
-qplot(times, ClotThickness, geom = "line")
+qplot(times, ClotThickness, geom = "line") + xlab("Time")
 ```
 
 # Inferring Hybrid Mechanistic-Statistical Models and the Unorthodox Nature of TEG Data
@@ -339,7 +343,7 @@ with initial value $y(0) = 1$ and $\lambda = 1$. The solution of this equation i
 value $y(t) = 0.6$ at $t = -\ln 0.6 \approx = 0.5108$. We set up a Stan model to infer the value of the initial condition
 given the value of the hitting time.
 
-```{r, message=TRUE}
+```{r, message=TRUE, cache = TRUE}
 library(rstan)
 options(mc.cores = parallel::detectCores())
 
@@ -351,9 +355,9 @@ fit.test.eq.stan.model <- stan_model("stan/fit_test_eq.stan", allow_undefined = 
                          includes = paste0('\n#include "', file.path(getwd(), 'src/cubic_spline_solvers.hpp'), '"\n'))
 
 # fit model
-# test.eq.stanfit <- sampling(fit.test.eq.stan.model, chains = 4, iter = 1000,
-#                 data = list(Nt = 200, ts = seq(0.01, 2.0, by = 0.01), teg = 0.5108256),
-#                 init = list(list(y0 = array(1,1)), list(y0 = array(1,1)), list(y0 = array(1,1)), list(y0 = array(1,1))))
+test.eq.stanfit <- sampling(fit.test.eq.stan.model, chains = 4, iter = 1000,
+                data = list(Nt = 200, ts = seq(0.01, 2.0, by = 0.01), teg = 0.5108256),
+                init = list(list(y0 = array(1,1)), list(y0 = array(1,1)), list(y0 = array(1,1)), list(y0 = array(1,1))))
 ```
 
 As expected, the value of the hitting time and the value of the initial condition are highly correlated. When the initial condition
@@ -361,20 +365,20 @@ is large, it takes longer for the ODE to reach $y(t) = 0.6$. Note that our poste
 variance than our prior samples, indicating that the stopping time is very informative of the initial value of the ODE.
 
 ```{r, message= FALSE, warning=FALSE}
-# print posterior summary and pairs plot
-# test.eq.stanfit
-# pairs(test.eq.stanfit, pars = c("y0", "teg_sim"))
-# 
-# # compare prior to posterior
-# test.eq.stan.samples <- rstan::extract(test.eq.stanfit, pars = c("y0", "teg_sim"))
-# 
-# tibble(y0.prior = rnorm(2000, 1, 0.1), y0.posterior = test.eq.stan.samples$y0[,1]) %>%
-#   gather(Distribution, Value) %>%
-#   mutate(Distribution = factor(Distribution, levels = c("y0.prior", "y0.posterior"), labels = c("Prior", "Posterior"))) %>%
-#   ggplot(aes(Value)) +
-#   geom_histogram(binwidth = 0.01) +
-#   facet_grid(Distribution ~ ., scales = "free") +
-#   xlab(expression(y[0]))
+#print posterior summary and pairs plot
+test.eq.stanfit
+pairs(test.eq.stanfit, pars = c("y0", "teg_sim"))
+
+# compare prior to posterior
+test.eq.stan.samples <- rstan::extract(test.eq.stanfit, pars = c("y0", "teg_sim"))
+
+tibble(y0.prior = rnorm(2000, 1, 0.1), y0.posterior = test.eq.stan.samples$y0[,1]) %>%
+  gather(Distribution, Value) %>%
+  mutate(Distribution = factor(Distribution, levels = c("y0.prior", "y0.posterior"), labels = c("Prior", "Posterior"))) %>%
+  ggplot(aes(Value)) +
+  geom_histogram(binwidth = 0.01) +
+  facet_grid(Distribution ~ ., scales = "free") +
+  xlab(expression(y[0]))
 
 ```
 
@@ -403,48 +407,48 @@ it helps to incorporate any prior knowledge we have about these parameters. For 
 
 With our priors set, we are ready to fit our model, integrating our prior knowledge and our data to produce a posterior distribution of this patient's $tPA$ values:
 
-```{r, message=TRUE}
+```{r, message=TRUE, cache = TRUE}
 # format data for Stan
-# times <- c(seq(0, 600, by = 6), seq(660, 1800, by = 60))
-# 
-# proteins <- patient.data %>% select(FII, AT, Fg, tPA, PAI) %>% as.matrix %>% as.vector
-# proteins <- ifelse(is.na(proteins), -1, proteins)
-# 
-# teg <-  patient.data %>% select(R, K, MA, Ly30) %>% as.matrix %>% as.vector
-# 
-# num_missing <- c(0,0,0,1,1)
-# 
-# dat <- list(Nt = length(times), ts = times, proteins = proteins, teg = teg, num_missing = num_missing)
-# 
-# # compile Stan model with custom C++ code
-# teg.cpp.src <- stanc("stan/fit_teg.stan", allow_undefined = TRUE)$cppcode
-# teg.stan.model <- stan_model("stan/fit_teg.stan", allow_undefined = TRUE,
-#                          includes = paste0('\n#include "', file.path(getwd(), 'src/cubic_spline_solvers.hpp'), '"\n'))
-# 
-# # fit model
-# teg.fit <- sampling(teg.stan.model, chains = 1, iter = 1000, data = dat,
-#                 control = list(adapt_delta = 0.99, max_treedepth = 8), refresh = 100,
-#                 init = list(list(FII_missing = rep(72.0, num_missing[1]),
-#                                  AT_missing = array(82.0, num_missing[2]),
-#                                  Fg_missing = rep(5.5-06, num_missing[3]),
-#                                  tPA_missing = array(1.6e-10, num_missing[4]),
-#                                  PAI_missing = array(3.4e-10, num_missing[5]),
-#                                  theta = c(3.0, 0.03))))
+times <- c(seq(0, 600, by = 6), seq(660, 1800, by = 60))
+
+proteins <- patient.data %>% select(FII, AT, Fg, tPA, PAI) %>% as.matrix %>% as.vector
+proteins <- ifelse(is.na(proteins), -1, proteins)
+
+teg <-  patient.data %>% select(R, K, MA, Ly30) %>% as.matrix %>% as.vector
+
+num_missing <- c(0,0,0,1,1)
+
+dat <- list(Nt = length(times), ts = times, proteins = proteins, teg = teg, num_missing = num_missing)
+
+# compile Stan model with custom C++ code
+teg.cpp.src <- stanc("stan/fit_teg.stan", allow_undefined = TRUE)$cppcode
+teg.stan.model <- stan_model("stan/fit_teg.stan", allow_undefined = TRUE,
+                         includes = paste0('\n#include "', file.path(getwd(), 'src/cubic_spline_solvers.hpp'), '"\n'))
+
+# fit model
+teg.fit <- sampling(teg.stan.model, chains = 1, iter = 1000, data = dat,
+                control = list(adapt_delta = 0.99, max_treedepth = 8), refresh = 100,
+                init = list(list(FII_missing = rep(72.0, num_missing[1]),
+                                 AT_missing = array(82.0, num_missing[2]),
+                                 Fg_missing = rep(5.5-06, num_missing[3]),
+                                 tPA_missing = array(1.6e-10, num_missing[4]),
+                                 PAI_missing = array(3.4e-10, num_missing[5]),
+                                 theta = c(3.0, 0.03))))
 
 ```
 
 Our MCMC diagnostics all pass, and we are ready to examine the posterior distribution of this patient's $tPA$ concentration. Sure enough, this patient's $tPA$ concentration is higher than the population average, which we used as our prior distribution. This is reflective of their relatively high Ly30 value, just as we expected. 
 
 ```{r}
-# teg.stan.samples <- rstan::extract(teg.fit, pars = c("tPA_missing"))
-# 
-# tibble(tPA.prior = rexp(500,1/(4e-10)), tPA.posterior = teg.stan.samples$tPA_missing[,1]) %>%
-#   gather(Distribution, Value) %>%
-#   mutate(Distribution = factor(Distribution, levels = c("tPA.prior", "tPA.posterior"), labels = c("Prior", "Posterior"))) %>%
-#   ggplot(aes(Value)) +
-#   geom_histogram() +
-#   facet_grid(Distribution ~ ., scales = "free") +
-#   xlab(expression(y[0]))
+teg.stan.samples <- rstan::extract(teg.fit, pars = c("tPA_missing"))
+
+tibble(tPA.prior = rexp(500,1/(4e-10)), tPA.posterior = teg.stan.samples$tPA_missing[,1]) %>%
+  gather(Distribution, Value) %>%
+  mutate(Distribution = factor(Distribution, levels = c("tPA.prior", "tPA.posterior"), labels = c("Prior", "Posterior"))) %>%
+  ggplot(aes(Value)) +
+  geom_histogram() +
+  facet_grid(Distribution ~ ., scales = "free") +
+  xlab(expression(y[0]))
 ```
 
 ## Acknowledgements
