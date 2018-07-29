@@ -407,6 +407,8 @@ patient.data
 Recall that in our mechanistic model every patient has "cascade delay" parameters $b$ and $c$ that describe the specific state of the coagulation cascade. Using our four pieces of TEG data, we must infer there two parameters and also the value of the unknown protein concentrations $tPA$ and $PAI$ for our patient. To do this reasonably,
 it helps to incorporate any prior knowledge we have about these parameters. For the protein concentrations, we set the prior distributions to exponential distributions with respective means 4e-10 and 9.3e-10. These are the distributions of these protein concentrations for general trauma patients. With the information given it's reasonable to assume our trauma patient's protein values are drawn form the distribution of protein values for trauma patients. For $b$ and $c$, we use weakly informative priors that are representative of a wide variety of possible coagulation profiles that we would expect to see in trauma patients.
 
+### Results
+
 With our priors set, we are ready to fit our model, integrating our prior knowledge and our data to produce a posterior distribution of this patient's $tPA$ values:
 
 ```{r, message=FALSE, warning = FALSE, results = "hide"}
@@ -429,19 +431,29 @@ teg.stan.model <- stan_model("stan/fit_teg.stan", allow_undefined = TRUE,
 ```
 
 ```{r, message=TRUE, warning=FALSE, cache = TRUE}
-# fit model
-teg.fit <- sampling(teg.stan.model, chains = 1, iter = 1000, data = dat,
-                control = list(adapt_delta = 0.99, max_treedepth = 8), refresh = 100,
-                init = list(list(FII_missing = rep(72.0, num_missing[1]),
+
+init.list <- list(FII_missing = rep(72.0, num_missing[1]),
                                  AT_missing = array(82.0, num_missing[2]),
                                  Fg_missing = rep(5.5-06, num_missing[3]),
                                  tPA_missing = array(1.6e-10, num_missing[4]),
                                  PAI_missing = array(3.4e-10, num_missing[5]),
-                                 theta = c(3.0, 0.03))))
+                                 theta = c(3.0, 0.03))
+
+# fit model
+teg.fit <- sampling(teg.stan.model, chains = 4, iter = 1000, data = dat,
+                control = list(adapt_delta = 0.99, max_treedepth = 8), refresh = 100,
+                init = rep(list(init.list),4))
 
 ```
 
-Our MCMC diagnostics all pass, and we are ready to examine the posterior distribution of this patient's $tPA$ concentration. Sure enough, this patient's $tPA$ concentration is higher than the population average, which we used as our prior distribution. This is reflective of their relatively high Ly30 value, just as we expected. 
+Once our model is fit we make sure to check our MCMC diagnostics, to ensure the integrity of our samples. In particular we make sure that there are no divergence or max tree depth warnings, and that the $\hat{R}$ value for all of the sample parameters is below 1.01. 
+
+```{r}
+teg.fit
+```
+
+
+We are now ready to examine the posterior distribution of this patient's $tPA$ concentration. Sure enough, this patient's $tPA$ concentration is higher than the population average, which we used as our prior distribution. This is reflective of their relatively high Ly30 value, just as we expected!
 
 ```{r}
 teg.stan.samples <- rstan::extract(teg.fit, pars = c("tPA_missing"))
@@ -452,8 +464,10 @@ tibble(tPA.prior = rexp(500,1/(4e-10)), tPA.posterior = teg.stan.samples$tPA_mis
   ggplot(aes(Value)) +
   geom_histogram() +
   facet_grid(Distribution ~ ., scales = "free") +
-  xlab(expression(y[0]))
+  xlab("Predicted tPA Value")
 ```
+
+# Discussion
 
 ## Acknowledgements
 
