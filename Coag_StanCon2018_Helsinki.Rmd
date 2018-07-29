@@ -86,7 +86,7 @@ $$
 Using the R package deSolve, we can forward simulate from this ODE to get an idea of what
 the solutions for this system look like:
 
-```{r}
+```{r, message = FALSE}
 library(tidyverse)
 library(deSolve)
 ```
@@ -343,7 +343,7 @@ with initial value $y(0) = 1$ and $\lambda = 1$. The solution of this equation i
 value $y(t) = 0.6$ at $t = -\ln 0.6 \approx = 0.5108$. We set up a Stan model to infer the value of the initial condition
 given the value of the hitting time.
 
-```{r, message=TRUE, cache = TRUE}
+```{r, message=FALSE, warning = FALSE, results = "hide"}
 library(rstan)
 options(mc.cores = parallel::detectCores())
 
@@ -353,7 +353,9 @@ fit.test.eq.cpp.src <- stanc("stan/fit_test_eq.stan", allow_undefined = TRUE)$cp
 
 fit.test.eq.stan.model <- stan_model("stan/fit_test_eq.stan", allow_undefined = TRUE,
                          includes = paste0('\n#include "', file.path(getwd(), 'src/cubic_spline_solvers.hpp'), '"\n'))
+```
 
+```{r, message=TRUE, cache = TRUE}
 # fit model
 test.eq.stanfit <- sampling(fit.test.eq.stan.model, chains = 4, iter = 1000,
                 data = list(Nt = 200, ts = seq(0.01, 2.0, by = 0.01), teg = 0.5108256),
@@ -364,7 +366,7 @@ As expected, the value of the hitting time and the value of the initial conditio
 is large, it takes longer for the ODE to reach $y(t) = 0.6$. Note that our posterior samples have a much smaller
 variance than our prior samples, indicating that the stopping time is very informative of the initial value of the ODE.
 
-```{r, message= FALSE, warning=FALSE}
+```{r, message= FALSE, warning=FALSE, cache = TRUE}
 #print posterior summary and pairs plot
 test.eq.stanfit
 pairs(test.eq.stanfit, pars = c("y0", "teg_sim"))
@@ -407,7 +409,7 @@ it helps to incorporate any prior knowledge we have about these parameters. For 
 
 With our priors set, we are ready to fit our model, integrating our prior knowledge and our data to produce a posterior distribution of this patient's $tPA$ values:
 
-```{r, message=TRUE, cache = TRUE}
+```{r, message=FALSE, warning = FALSE, results = "hide"}
 # format data for Stan
 times <- c(seq(0, 600, by = 6), seq(660, 1800, by = 60))
 
@@ -424,7 +426,9 @@ dat <- list(Nt = length(times), ts = times, proteins = proteins, teg = teg, num_
 teg.cpp.src <- stanc("stan/fit_teg.stan", allow_undefined = TRUE)$cppcode
 teg.stan.model <- stan_model("stan/fit_teg.stan", allow_undefined = TRUE,
                          includes = paste0('\n#include "', file.path(getwd(), 'src/cubic_spline_solvers.hpp'), '"\n'))
+```
 
+```{r, message=TRUE, warning=FALSE, cache = TRUE}
 # fit model
 teg.fit <- sampling(teg.stan.model, chains = 1, iter = 1000, data = dat,
                 control = list(adapt_delta = 0.99, max_treedepth = 8), refresh = 100,
