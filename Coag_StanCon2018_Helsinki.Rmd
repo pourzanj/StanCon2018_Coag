@@ -469,6 +469,12 @@ tibble(tPA.prior = rexp(500,1/(4e-10)), tPA.posterior = teg.stan.samples$tPA_mis
 
 # Discussion
 
+We showed how one can tackle the very practical problem of tying together disparate measures of coagulopathy by incorporating mechanistic and statistical knowledge in to Stan. In particular, we showed how TEG data, which consists of unorthodox measurement quantities, can be used to infer much less ubiquitous but more informative protein data with clever use of techniques from numerical analysis such as splines, root-finding, and the inverse function theorem.
+
+In this notebook we fit a model to a single patient first to illustrate our tying together of various numerical techniques, and second to show how a mechanistic model together with Bayesian analysis in Stan can be used in a practical clinical setting to infer useful information. In a larger study for the purpose of more specific model callibration/checking it may be useful to fit multiple patients, forward simulate TEG data, and check callibration quantities with respect to uncertainty intervals to ensure that modeling and distributional assumptions are sound. We did not pursue this further in this notebook as it was outside of our scope, but we mention it for completeness.
+
+We also point out that our priors for the protein concentrations were selected using an "empirical Bayes'" approach where we fit a point estimate to protein data from an entire population of patients we had data for. In a sense, this is a computationally convenient approximation to a hierarchical model which would simaltaneously incorporate data from multiple patients and "learn" the population level distributions.
+
 ## Acknowledgements
 
 Research reported in this publication was performed by the Systems Biology
