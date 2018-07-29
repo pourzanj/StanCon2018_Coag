@@ -446,7 +446,7 @@ teg.fit <- sampling(teg.stan.model, chains = 4, iter = 1000, data = dat,
 
 ```
 
-Once our model is fit we make sure to check our MCMC diagnostics, to ensure the integrity of our samples. In particular we make sure that there are no divergence or max tree depth warnings, and that the $\hat{R}$ value for all of the sample parameters is below 1.01. 
+Once our model is fit we make sure to check our MCMC diagnostics, to ensure the integrity of our samples. In particular we make sure that there are no divergences and few max tree depth warnings, and that the $\hat{R}$ value for all of the sample parameters is below 1.01. 
 
 ```{r}
 teg.fit
@@ -458,7 +458,7 @@ We are now ready to examine the posterior distribution of this patient's $tPA$ c
 ```{r}
 teg.stan.samples <- rstan::extract(teg.fit, pars = c("tPA_missing"))
 
-tibble(tPA.prior = rexp(500,1/(4e-10)), tPA.posterior = teg.stan.samples$tPA_missing[,1]) %>%
+tibble(tPA.prior = rexp(2000,1/(4e-10)), tPA.posterior = teg.stan.samples$tPA_missing[,1]) %>%
   gather(Distribution, Value) %>%
   mutate(Distribution = factor(Distribution, levels = c("tPA.prior", "tPA.posterior"), labels = c("Prior", "Posterior"))) %>%
   ggplot(aes(Value)) +
